@@ -739,18 +739,35 @@ function renderCheckout() {
 }
 
 function orderText(o) {
-  var lines = ["Zamówienie " + o.number, "",
-    "Klient: " + o.customer.name, "E-mail: " + o.customer.email, "Telefon: " + o.customer.phone, "",
-    "Dostawa: " + o.delivery.method];
-  if (o.delivery.locker) lines.push("Paczkomat: " + o.delivery.locker);
-  if (o.delivery.street) lines.push("Adres: " + o.delivery.street + ", " + o.delivery.zip + " " + o.delivery.city);
-  lines.push("Płatność: " + PAY_LABEL[o.payment], "", "Produkty:");
-  o.items.forEach(function (i) { lines.push("- " + i.name + ", " + i.size + " ml × " + i.qty + " = " + pln(i.price * i.qty)); });
-  lines.push("", "Produkty: " + pln(o.subtotal), "Dostawa: " + pln(o.shipping));
-  if (o.fee) lines.push("Opłata za pobranie: " + pln(o.fee));
-  lines.push("Razem: " + pln(o.total));
-  if (o.note) lines.push("", "Uwagi: " + o.note);
-  return lines.join("\n");
+  var line = "----------------------------------------";
+  var pay = o.payment === "cod"
+    ? "Płatność przy odbiorze: klient zapłaci " + pln(o.total) + " kurierowi lub w paczkomacie"
+    : o.payment === "transfer"
+      ? "Przelew tradycyjny: czekaj na wpłatę " + pln(o.total) + " (tytuł przelewu: " + o.number + ")"
+      : "Płatność online: " + pln(o.total);
+  var L = [];
+  L.push("ZAMÓWIENIE " + o.number, line, "");
+  L.push("KLIENT",
+    "Imię i nazwisko: " + o.customer.name,
+    "E-mail: " + o.customer.email,
+    "Telefon: " + o.customer.phone, "");
+  L.push("DOSTAWA", "Sposób: " + o.delivery.method);
+  if (o.delivery.locker) L.push("Kod paczkomatu: " + o.delivery.locker);
+  if (o.delivery.street) L.push("Adres: " + o.delivery.street, "Kod i miasto: " + o.delivery.zip + " " + o.delivery.city);
+  L.push("");
+  L.push("PRODUKTY DO SPAKOWANIA");
+  o.items.forEach(function (i, n) {
+    L.push((n + 1) + ". " + i.name + " | " + i.size + " ml | " + i.qty + " szt. | " + pln(i.price * i.qty));
+  });
+  L.push("");
+  L.push("PODSUMOWANIE",
+    "Produkty: " + pln(o.subtotal),
+    "Dostawa: " + (o.shipping ? pln(o.shipping) : "gratis"));
+  if (o.fee) L.push("Opłata za pobranie: " + pln(o.fee));
+  L.push("RAZEM: " + pln(o.total), "");
+  L.push("PŁATNOŚĆ", pay);
+  if (o.note) L.push("", "UWAGI KLIENTA", o.note);
+  return L.join("\n");
 }
 
 function sendOrder(order) {
@@ -758,11 +775,11 @@ function sendOrder(order) {
   return fetch(CONFIG.ORDER_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Accept": "application/json" },
-    body: JSON.stringify(Object.assign({}, order, {
+    body: JSON.stringify({
+      _subject: "Nowe zamówienie " + order.number + " – " + pln(order.total),
       email: order.customer.email,
-      _subject: "Nowe zamówienie " + order.number,
       message: orderText(order)
-    }))
+    })
   }).then(function (r) { if (!r.ok) throw new Error("http"); return true; });
 }
 
