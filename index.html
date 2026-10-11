@@ -631,7 +631,8 @@ var CONFIG = {
   PAYMENT_LINK: "",     // link do płatności online (np. od Stripe lub Przelewy24)
   BANK_NAME: "Dom Zapachów",
   BANK_ACCOUNT: "00 0000 0000 0000 0000 0000 0000",
-  ORDER_EMAIL: "kontakt@domzapachow.pl"
+  ORDER_EMAIL: "kontakt@domzapachow.pl",
+  CONFIRM_ENDPOINT: "https://script.google.com/macros/s/AKfycbx5AEQupkfazqjd90HbduAe_pL2-uZ27qgFSZQEBvk4mTlX6KkX8K3vTmUCcvVYf93s/exec"  // adres wdrożonego Google Apps Script (potwierdzenia dla klientów)
 };
 var SHIP = { inpost: { label: "Paczkomat InPost", price: 14 }, kurier: { label: "Kurier", price: 19 } };
 var PAY_LABEL = { online: "Płatność online", transfer: "Przelew tradycyjny", cod: "Płatność przy odbiorze" };
@@ -795,6 +796,18 @@ function sendOrder(order) {
   }).then(function (r) { if (!r.ok) throw new Error("http"); return true; });
 }
 
+function sendConfirmation(order) {
+  if (!CONFIG.CONFIRM_ENDPOINT) return;
+  try {
+    fetch(CONFIG.CONFIRM_ENDPOINT, {
+      method: "POST",
+      mode: "no-cors",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(order)
+    }).catch(function () {});
+  } catch (e) {}
+}
+
 function submitOrder(e) {
   e.preventDefault();
   var form = e.target, fd = new FormData(form), t = totals(), d = new Date();
@@ -821,6 +834,7 @@ function submitOrder(e) {
   var btn = document.getElementById("coSubmit"), err = document.getElementById("coError");
   btn.disabled = true; btn.textContent = "Wysyłanie…"; err.textContent = "";
   sendOrder(order).then(function (sent) {
+    if (sent) sendConfirmation(order);
     showDone(order, sent);
   }).catch(function () {
     err.textContent = "Nie udało się wysłać zamówienia. Spróbuj ponownie lub napisz na " + CONFIG.ORDER_EMAIL + ".";
@@ -852,7 +866,8 @@ function showDone(order, sent) {
     '<a class="btn" href="mailto:' + esc(CONFIG.ORDER_EMAIL) + '?subject=' + encodeURIComponent("Zamówienie " + order.number) + '&body=' + encodeURIComponent(orderText(order)) + '">Wyślij zamówienie e-mailem</a></div>';
   document.getElementById("coBody").innerHTML =
     '<div class="done"><h1>Dziękujemy za zamówienie</h1>' +
-    '<p class="co-sub">Numer zamówienia: <strong style="color:var(--text)">' + order.number + '</strong></p>' +
+    '<p class="co-sub">Numer zamówienia: <strong style="color:var(--text)">' + order.number + '</strong>' +
+    (sent && CONFIG.CONFIRM_ENDPOINT ? '<br>Potwierdzenie wysyłamy na adres ' + esc(order.customer.email) + '.' : '') + '</p>' +
     demo + pay +
     '<div class="box"><h2>Podsumowanie</h2><ul>' +
     order.items.map(function (i) { return '<li>' + esc(i.name) + ', ' + i.size + ' ml × ' + i.qty + '</li>'; }).join("") +
