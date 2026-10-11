@@ -615,7 +615,7 @@ document.addEventListener("keydown", function (e) { if (e.key === "Escape") clos
 /* ---------- Zamówienie i płatność ---------- */
 /* Uzupełnij te dane, żeby zamówienia i płatności działały naprawdę. */
 var CONFIG = {
-  ORDER_ENDPOINT: "",   // adres, na który trafiają zamówienia (np. z Formspree lub Web3Forms)
+  ORDER_ENDPOINT: "https://formspree.io/f/mljglwby",   // adres, na który trafiają zamówienia (np. z Formspree lub Web3Forms)
   PAYMENT_LINK: "",     // link do płatności online (np. od Stripe lub Przelewy24)
   BANK_NAME: "Dom Zapachów",
   BANK_ACCOUNT: "00 0000 0000 0000 0000 0000 0000",
@@ -758,7 +758,11 @@ function sendOrder(order) {
   return fetch(CONFIG.ORDER_ENDPOINT, {
     method: "POST",
     headers: { "Content-Type": "application/json", "Accept": "application/json" },
-    body: JSON.stringify(order)
+    body: JSON.stringify(Object.assign({}, order, {
+      email: order.customer.email,
+      _subject: "Nowe zamówienie " + order.number,
+      message: orderText(order)
+    }))
   }).then(function (r) { if (!r.ok) throw new Error("http"); return true; });
 }
 
